@@ -1,0 +1,22 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Dados e banco local (gerados pelo pipeline, nao versionados)
+data/
+*.duckdb
+*.duckdb.wal
+
+# dbt
+target/
+dbt_packages/
+logs/
+
+# Editor e sistema
+.vscode/
+.DS_Store
+
+# Configuracao local de ferramentas
+CLAUDE.md
+.claude/
