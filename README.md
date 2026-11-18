@@ -5,7 +5,7 @@ Pipeline de dados do setor elétrico brasileiro, construído com ferramentas abe
 Coleta os dados abertos do ONS (Operador Nacional do Sistema Elétrico), organiza em camadas
 (bronze, silver, gold) e entrega um modelo dimensional pronto para análise.
 
-> **Status:** em construção. Fase 0 (ambiente) concluída.
+> **Status:** em construção. Fases 0 a 2 concluídas (ambiente, exploração das fontes e modelo de dados).
 
 ## Stack
 
@@ -47,8 +47,8 @@ dbt --version
 ## Roteiro
 
 - [x] Fase 0: ambiente e repositório
-- [ ] Fase 1: explorar as fontes do ONS
-- [ ] Fase 2: modelo de dados
+- [x] Fase 1: explorar as fontes do ONS ([achados](docs/decisoes.md))
+- [x] Fase 2: modelo de dados ([modelo](docs/modelo_dados.md))
 - [ ] Fase 3: ingestão (bronze)
 - [ ] Fase 4: silver com testes de qualidade
 - [ ] Fase 5: gold e dashboard público

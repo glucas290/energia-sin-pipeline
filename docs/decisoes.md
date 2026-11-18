@@ -57,12 +57,15 @@ anterior, e detectar mudança nas demais pelo `ETag`/`LastModified` do S3.
 **Schema muda entre anos no mesmo conjunto (intercâmbio).** O Parquet de 2025 tem
 `val_intercambiomwmed` como `DOUBLE` e não tem `val_intercambioprogmwmed`; o de 2026
 tem as duas colunas, ambas como `VARCHAR`. O CSV de 2026 é lido com os tipos certos.
+O mesmo acontece na geração: no Parquet de jan/2024, `val_geracao` é `VARCHAR`.
 
-**Sentido do intercâmbio vira conforme o fluxo.** São 4 pares de subsistemas por hora
-(N–NE, N–SE, NE–SE, S–SE), mas `origem`/`destino` trocam de lugar de hora em hora
-para que o valor verificado seja sempre positivo. Já o valor programado pode ser
-negativo (2.270 linhas em 2026). Para somar ou comparar, a silver precisa normalizar
-cada par numa orientação fixa e aplicar o sinal.
+**A convenção de sentido do intercâmbio mudou em 2026.** São 4 pares de subsistemas
+por hora (N–NE, N–SE, NE–SE, S–SE). Até 2025 cada par tem orientação fixa e o valor
+verificado tem sinal (negativo = fluxo contrário). Em 2026 `origem`/`destino` trocam
+de lugar de hora em hora para que o valor verificado seja sempre positivo, e surge
+a coluna `val_intercambioprogmwmed`, que pode ser negativa (2.270 linhas). A silver
+normaliza cada par numa orientação fixa e inverte o sinal quando a linha vem no
+sentido contrário; a mesma regra serve para as duas convenções.
 
 **Nomes de subsistema inconsistentes.** A carga usa `Norte`, `Sudeste/Centro-Oeste`;
 a geração usa `NORTE`, `SUDESTE`; o intercâmbio usa `' NORTE'` (espaço à esquerda); a
@@ -103,3 +106,67 @@ passar silenciosamente. O custo é a carga inicial da geração (2,3 GB, uma vez
 depois são cerca de 65 MB por mês.
 
 Os dados baixados ficam em `data/`, dentro do projeto, fora do Git.
+
+## Fase 2: modelo de dados
+
+O desenho completo está em [modelo_dados.md](modelo_dados.md).
+
+### Grão de `fato_geracao`: hora × usina
+
+Mantive o grão mais fino que a fonte oferece. Agregar por dia depois é trivial; o
+contrário é impossível. São cerca de 17 milhões de linhas para 2024–2026, volume que
+o DuckDB processa sem esforço. A alternativa era gravar só a soma diária por usina.
+
+### Tempo: `dim_data` diária e hora como coluna
+
+A carga é diária e a geração e o intercâmbio são horários. Com a dimensão no grão do
+dia, as três fatos se ligam a ela do mesmo jeito, e a hora fica como coluna nas fatos
+horárias. Uma dimensão horária (8.760 linhas por ano) deixaria a carga sem ter onde
+se ligar. Renomeei `dim_tempo` para `dim_data`, que descreve melhor o conteúdo.
+
+### Chave de `dim_usina` e SCD tipo 1
+
+Comparando jan/2024 com nov/2026, todas as 491 usinas presentes nos dois meses mudaram
+a grafia do nome (`Jaguara` → `JAGUARA`, `Salto do Rio Verdinho` → `S.R.VERDINHO`), e
+há nomes repetidos entre usinas diferentes (`UTE SUZANO` no MA e no MS). O nome não
+serve como chave.
+
+A chave natural é o `id_ons`. Os 117 agregados de pequenas usinas (Tipo III e MMGD)
+não têm `id_ons` e não existiam em jan/2024; neles a chave é o nome, que é
+sintético e estável (`PQU ACRAC MMGD`). Sobre essa chave natural gero um hash como
+chave substituta.
+
+Para mudanças de atributo, uso SCD tipo 1 (sobrescreve, fica a versão mais recente).
+O histórico de grafias não responde nenhuma pergunta de negócio, e o tipo 2 traria
+intervalos de validade e joins por data sem retorno.
+
+### `dim_fonte` no nível do tipo de usina
+
+Geração e capacidade concordam nos 5 tipos de usina, mas não nos combustíveis (`Gás`
+contra `GÁS`, `RESÍDUO CICLO COMBINADO` só na capacidade, unidades fotovoltaicas com
+combustível `EÓLICA`). Com a fonte no nível do tipo, os dois conjuntos se cruzam sem
+mapeamento manual; o combustível fica como atributo de `dim_usina`.
+
+### Capacidade como fato por unidade geradora
+
+A capacidade não tem `id_ons`, e o `ceg` casa só 302 dos 322 CEGs da geração. Em vez
+de pendurar a potência em `dim_usina` por esse join frágil, criei `fato_capacidade`
+com uma linha por unidade geradora e suas datas de entrada e desativação, ligada a
+fonte e subsistema. Isso permite calcular a capacidade instalada em qualquer data e o
+fator de capacidade (geração / capacidade) por fonte e subsistema. A alternativa era
+somar a potência como atributo da usina, que perde a evolução no tempo.
+
+A capacidade inclui o subsistema `PY` (10 unidades, 7.000 MW: a parte paraguaia de
+Itaipu). Ele entra em `dim_subsistema` marcado como fora do SIN.
+
+### Medidas em MWmed e MWh
+
+MWmed é média e não pode ser somado ao longo do tempo. Cada fato guarda também
+`energia_mwh`, aditiva em qualquer dimensão (MWmed × 1 nas fatos horárias, × 24 na
+carga).
+
+### Pontos para os testes de qualidade (Fase 4)
+
+- 8 unidades geradoras têm `dat_desativacao` anterior a `dat_entradaoperacao`.
+- 8 unidades não têm `dat_entradateste`.
+- `val_geracao` nulo em usinas sem medição: manter como nulo, não como zero.
