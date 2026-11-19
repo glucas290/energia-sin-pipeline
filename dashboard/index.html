@@ -4,47 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Energia no SIN</title>
-<meta name="description" content="Painel do Sistema Interligado Nacional com dados abertos do ONS, atualizado diariamente.">
-<style>
-  :root {
-    --fundo: #f6f7f9; --cartao: #ffffff; --texto: #1d2330; --suave: #5d6676;
-    --borda: #e3e6eb; --destaque: #2f6fb0;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --fundo: #12151b; --cartao: #1b1f27; --texto: #e6e9ef; --suave: #9aa3b2;
-      --borda: #2a303b; --destaque: #6aa4e0;
-    }
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--fundo); color: var(--texto);
-    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  }
-  main { max-width: 1180px; margin: 0 auto; padding: 24px 16px 48px; }
-  header h1 { margin: 0 0 4px; font-size: 1.7rem; }
-  header p { margin: 0; color: var(--suave); }
-  header a, footer a { color: var(--destaque); }
-  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 24px 0; }
-  @media (max-width: 480px) { .kpi .valor { font-size: 1.45rem; } .grafico { height: 300px; } }
-  .kpi { background: var(--cartao); border: 1px solid var(--borda); border-radius: 10px; padding: 14px 16px; }
-  .kpi .valor { font-size: 1.8rem; font-weight: 650; }
-  .kpi .rotulo { color: var(--suave); font-size: .88rem; }
-  .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 16px; }
-  section.cartao { background: var(--cartao); border: 1px solid var(--borda); border-radius: 10px; padding: 16px; min-width: 0; }
-  section.largo { grid-column: 1 / -1; }
-  h2 { margin: 0 0 2px; font-size: 1.05rem; }
-  .nota { margin: 0 0 8px; color: var(--suave); font-size: .86rem; }
-  .grafico { width: 100%; height: 340px; }
-  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
-  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--borda); }
-  th { color: var(--suave); font-weight: 600; }
-  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-  .tabelas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; }
-  .tabela { overflow-x: auto; }
-  footer { margin-top: 32px; color: var(--suave); font-size: .85rem; }
-  #erro { display: none; padding: 16px; border: 1px solid #c0392b; border-radius: 8px; }
-</style>
+<meta name="description" content="Painel interativo do Sistema Interligado Nacional com dados abertos do ONS, atualizado diariamente.">
+<link rel="stylesheet" href="estilo.css">
 </head>
 <body>
 <main>
@@ -57,48 +18,117 @@
 
   <div id="erro">Não foi possível carregar os dados.</div>
 
+  <section class="filtros" aria-label="Filtros">
+    <div class="linha-filtro">
+      <span class="rotulo">Período</span>
+      <span id="f-periodo"></span>
+      <span class="datas">
+        <input type="date" id="f-ini" aria-label="Data inicial"> até
+        <input type="date" id="f-fim" aria-label="Data final">
+      </span>
+    </div>
+    <div class="linha-filtro">
+      <span class="rotulo">Subsistema</span>
+      <span id="f-subs"></span>
+    </div>
+    <div class="linha-filtro">
+      <span class="rotulo">Fonte</span>
+      <span id="f-fontes"></span>
+    </div>
+    <div class="linha-filtro">
+      <span class="rotulo">Agrupar por</span>
+      <span id="f-gran"></span>
+      <button class="limpar" id="limpar" type="button">Limpar filtros</button>
+    </div>
+  </section>
+  <p class="resumo" id="resumo"></p>
+
   <div class="kpis">
-    <div class="kpi"><div class="valor" id="k-carga">…</div><div class="rotulo">carga média nos últimos 30 dias</div></div>
-    <div class="kpi"><div class="valor" id="k-renovavel">…</div><div class="rotulo">da geração foi renovável nos últimos 12 meses</div></div>
-    <div class="kpi"><div class="valor" id="k-capacidade">…</div><div class="rotulo">de capacidade instalada (usinas despachadas pelo ONS)</div></div>
-    <div class="kpi"><div class="valor" id="k-mmgd">…</div><div class="rotulo">da geração solar vem de geração distribuída (telhados e pequenas usinas)</div></div>
+    <div class="kpi"><div class="valor" id="k-energia">…</div><div class="rotulo">gerados no período</div><div class="extra" id="k-energia-x"></div></div>
+    <div class="kpi"><div class="valor" id="k-renovavel">…</div><div class="rotulo">da geração foi renovável</div><div class="extra">considera subsistema</div></div>
+    <div class="kpi"><div class="valor" id="k-carga">…</div><div class="rotulo">de carga média</div><div class="extra" id="k-carga-x"></div></div>
+    <div class="kpi"><div class="valor" id="k-pico">…</div><div class="rotulo">pico de carga diária</div><div class="extra" id="k-pico-x"></div></div>
+    <div class="kpi"><div class="valor" id="k-capacidade">…</div><div class="rotulo">de capacidade instalada</div><div class="extra" id="k-capacidade-x"></div></div>
+    <div class="kpi"><div class="valor" id="k-mmgd">…</div><div class="rotulo">da solar vem de geração distribuída</div><div class="extra">telhados e pequenas usinas</div></div>
   </div>
 
   <div class="grade">
     <section class="cartao largo">
-      <h2>Geração mensal por fonte</h2>
-      <p class="nota">TWh por mês, meses fechados.</p>
+      <div class="cabecalho">
+        <h2>Geração por fonte</h2>
+        <span class="alternar" id="modo-geracao"></span>
+      </div>
+      <p class="nota">Clique numa fonte para filtrar a página inteira por ela. <span class="aplica">Filtros: período, subsistema, fonte.</span></p>
       <div class="grafico" id="g-geracao"></div>
     </section>
 
     <section class="cartao">
+      <h2>Matriz no período</h2>
+      <p class="nota">Participação de cada fonte na energia gerada. <span class="aplica">Filtros: período, subsistema, fonte.</span></p>
+      <div class="grafico" id="g-matriz"></div>
+    </section>
+
+    <section class="cartao">
+      <h2>Geração e carga por subsistema</h2>
+      <p class="nota">Onde a geração passa da carga, o subsistema exporta energia. Clique para filtrar. <span class="aplica">Filtros: período, fonte (só na geração).</span></p>
+      <div class="grafico" id="g-subsistemas"></div>
+    </section>
+
+    <section class="cartao">
       <h2>Perfil médio do dia</h2>
-      <p class="nota">GW médios por hora nos últimos 30 dias. A solar ocupa o meio do dia e a hidráulica compensa à noite.</p>
+      <p class="nota">GW médios por hora nos meses do período. <span class="aplica">Filtros: período, subsistema, fonte.</span></p>
       <div class="grafico" id="g-perfil"></div>
     </section>
 
     <section class="cartao">
       <h2>Fator de capacidade</h2>
-      <p class="nota">Geração média ÷ capacidade instalada, por mês. Exclui a geração distribuída, que não entra no cadastro de capacidade.</p>
+      <p class="nota">Geração média ÷ capacidade instalada, por mês, só usinas despachadas pelo ONS. <span class="aplica">Filtros: período, subsistema, fonte.</span></p>
       <div class="grafico" id="g-fator"></div>
     </section>
 
     <section class="cartao largo">
-      <h2>Carga diária do SIN desde 2000</h2>
-      <p class="nota">GW médios por dia e média móvel de 7 dias. Arraste a barra inferior para aproximar um período.</p>
+      <h2>Carga por subsistema</h2>
+      <p class="nota">GW médios. Histórico desde 2000: escolha "Tudo" no período e agrupe por ano para ver a tendência longa. <span class="aplica">Filtros: período, subsistema.</span></p>
       <div class="grafico" id="g-carga"></div>
     </section>
 
     <section class="cartao">
-      <h2>Capacidade instalada por fonte</h2>
-      <p class="nota">GW em operação no fim de cada mês, sem a parte paraguaia de Itaipu.</p>
+      <h2>Capacidade instalada</h2>
+      <p class="nota">GW em operação no fim de cada intervalo, sem a parte paraguaia de Itaipu. <span class="aplica">Filtros: período, subsistema, fonte.</span></p>
       <div class="grafico" id="g-capacidade"></div>
     </section>
 
     <section class="cartao">
       <h2>Intercâmbio entre subsistemas</h2>
-      <p class="nota">TWh por mês. Positivo é fluxo no sentido indicado; negativo, no sentido contrário.</p>
+      <p class="nota">TWh por par; positivo é fluxo no sentido indicado. <span class="aplica">Filtros: período, subsistema.</span></p>
       <div class="grafico" id="g-intercambio"></div>
+    </section>
+
+    <section class="cartao largo">
+      <h2>Saldo de intercâmbio por subsistema</h2>
+      <p class="nota">Energia que cada subsistema enviou (positivo) ou recebeu (negativo) no período. Clique para filtrar. <span class="aplica">Filtros: período.</span></p>
+      <div class="grafico baixo" id="g-saldo"></div>
+    </section>
+
+    <section class="cartao largo">
+      <div class="cabecalho">
+        <h2>Ranking de usinas</h2>
+        <button class="botao" id="baixar" type="button">Baixar CSV</button>
+      </div>
+      <p class="nota">Energia gerada nos meses do período. Clique numa usina para ver o histórico. <span class="aplica">Filtros: período, subsistema, fonte.</span></p>
+      <div class="ferramentas">
+        <input type="search" id="busca" placeholder="Buscar usina ou UF">
+        <span class="alternar" id="qtd-ranking"></span>
+      </div>
+      <div class="tabela"><table id="ranking"></table></div>
+      <div class="detalhe" id="detalhe" hidden>
+        <div class="cabecalho">
+          <h2 id="detalhe-titulo"></h2>
+          <button class="botao" id="fechar-detalhe" type="button">Fechar</button>
+        </div>
+        <p class="nota" id="detalhe-nota"></p>
+        <div class="grafico baixo" id="g-usina"></div>
+      </div>
     </section>
 
     <section class="cartao largo">
@@ -119,140 +149,6 @@
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
-<script>
-const CORES = { hidraulica: '#2f6fb0', eolica: '#2a9d8f', solar: '#e9a92b', termica: '#8d6e63', nuclear: '#7e57c2' };
-const ORDEM = ['hidraulica', 'eolica', 'solar', 'termica', 'nuclear'];
-const CORES_PARES = { 'N→NE': '#2a9d8f', 'N→SE': '#2f6fb0', 'NE→SE': '#e9a92b', 'S→SE': '#c0504d' };
-
-const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-const fmt = (v, d = 1) => v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
-const dataBR = iso => iso.slice(0, 10).split('-').reverse().join('/');
-
-function base() {
-  const texto = css('--suave'), borda = css('--borda');
-  return {
-    textStyle: { color: texto, fontFamily: 'system-ui, sans-serif' },
-    grid: { left: 48, right: 16, top: 56, bottom: 40 },
-    legend: { top: 0, textStyle: { color: texto }, type: 'scroll' },
-    tooltip: { trigger: 'axis', valueFormatter: v => v == null ? '–' : fmt(v) },
-    xAxis: { axisLine: { lineStyle: { color: borda } }, axisLabel: { color: texto } },
-    yAxis: { type: 'value', splitLine: { lineStyle: { color: borda } }, axisLabel: { color: texto } },
-  };
-}
-
-function pivot(linhas, x, serie, valor) {
-  const xs = [...new Set(linhas.map(l => l[x]))];
-  const idx = new Map(xs.map((v, i) => [v, i]));
-  const series = {};
-  for (const l of linhas) {
-    (series[l[serie]] ??= Array(xs.length).fill(null))[idx.get(l[x])] = l[valor];
-  }
-  return { xs, series };
-}
-
-const graficos = [];
-function desenhar(id, opcoes) {
-  const g = echarts.init(document.getElementById(id));
-  g.setOption(echarts.util.merge(base(), opcoes, true));
-  graficos.push(g);
-}
-window.addEventListener('resize', () => graficos.forEach(g => g.resize()));
-
-function porFonte(linhas, x, valor, tipo, nomes, extra = {}) {
-  const { xs, series } = pivot(linhas, x, 'fonte_id', valor);
-  return {
-    xAxis: { type: 'category', data: xs, boundaryGap: tipo === 'bar' },
-    series: ORDEM.filter(f => series[f]).map(f => ({
-      name: nomes[f], type: tipo, data: series[f], itemStyle: { color: CORES[f] },
-      lineStyle: { color: CORES[f] }, showSymbol: false, ...extra,
-    })),
-  };
-}
-
-function tabela(id, colunas, linhas) {
-  const t = document.getElementById(id);
-  t.innerHTML = '<thead><tr>' + colunas.map(c => `<th class="${c.num ? 'num' : ''}">${c.titulo}</th>`).join('') +
-    '</tr></thead><tbody>' + linhas.map(l => '<tr>' + colunas.map(c =>
-      `<td class="${c.num ? 'num' : ''}">${c.valor(l)}</td>`).join('') + '</tr>').join('') + '</tbody>';
-}
-
-fetch('dados.json').then(r => r.json()).then(d => {
-  const nomes = Object.fromEntries(d.fontes.map(f => [f.fonte_id, f.nome_fonte]));
-  const k = d.kpis;
-  document.getElementById('dados-ate').textContent = dataBR(k.geracao_ate);
-  document.getElementById('gerado-em').textContent = new Date(d.gerado_em).toLocaleString('pt-BR');
-  document.getElementById('k-carga').textContent = fmt(k.carga_30d_gw) + ' GW';
-  document.getElementById('k-renovavel').textContent = fmt(k.renovavel_12m * 100, 0) + '%';
-  document.getElementById('k-capacidade').textContent = fmt(k.capacidade_gw, 0) + ' GW';
-  document.getElementById('k-mmgd').textContent = fmt(k.mmgd_na_solar_12m * 100, 0) + '%';
-
-  desenhar('g-geracao', {
-    ...porFonte(d.geracao_mensal, 'ano_mes', 'twh', 'bar', nomes, { stack: 'total', barMaxWidth: 28 }),
-    yAxis: { name: 'TWh' },
-  });
-
-  const perfil = porFonte(d.perfil_horario, 'hora', 'gw', 'line', nomes, { stack: 'total', areaStyle: { opacity: .85 } });
-  desenhar('g-perfil', {
-    ...perfil,
-    xAxis: { ...perfil.xAxis, name: 'hora', nameLocation: 'middle', nameGap: 26 },
-    yAxis: { name: 'GW' },
-  });
-
-  desenhar('g-fator', {
-    ...porFonte(d.fator_capacidade.map(l => ({ ...l, fator: l.fator * 100 })), 'ano_mes', 'fator', 'line', nomes),
-    yAxis: { name: '%', max: 100 },
-  });
-
-  const dias = d.carga_diaria.map(l => l.data);
-  const gw = d.carga_diaria.map(l => l.gw);
-  const media7 = gw.map((_, i) => i < 6 ? null : gw.slice(i - 6, i + 1).reduce((a, b) => a + b, 0) / 7);
-  desenhar('g-carga', {
-    grid: { bottom: 64 },
-    xAxis: { type: 'category', data: dias },
-    yAxis: { name: 'GW', scale: true },
-    dataZoom: [{ type: 'slider', start: 85, end: 100, height: 22, bottom: 8 }, { type: 'inside' }],
-    series: [
-      { name: 'carga diária', type: 'line', data: gw, showSymbol: false, lineStyle: { width: 1, color: '#9fb4cc' }, itemStyle: { color: '#9fb4cc' } },
-      { name: 'média de 7 dias', type: 'line', data: media7, showSymbol: false, lineStyle: { width: 2, color: '#2f6fb0' }, itemStyle: { color: '#2f6fb0' } },
-    ],
-  });
-
-  desenhar('g-capacidade', {
-    ...porFonte(d.capacidade_mensal, 'ano_mes', 'gw', 'line', nomes, { stack: 'total', areaStyle: { opacity: .85 } }),
-    yAxis: { name: 'GW' },
-  });
-
-  const inter = pivot(d.intercambio_mensal, 'ano_mes', 'par', 'twh');
-  desenhar('g-intercambio', {
-    xAxis: { type: 'category', data: inter.xs },
-    yAxis: { name: 'TWh' },
-    series: Object.keys(CORES_PARES).filter(p => inter.series[p]).map(p => ({
-      name: p, type: 'bar', data: inter.series[p], itemStyle: { color: CORES_PARES[p] }, barMaxWidth: 10,
-    })),
-  });
-
-  const n = v => v.toLocaleString('pt-BR');
-  tabela('t-qualidade', [
-    { titulo: 'Fonte', valor: l => l.fonte },
-    { titulo: 'Lidas', num: true, valor: l => n(l.linhas_lidas) },
-    { titulo: 'Gravadas', num: true, valor: l => n(l.linhas_gravadas) },
-    { titulo: 'Quarentena', num: true, valor: l => n(l.linhas_rejeitadas) },
-  ], d.qualidade);
-  tabela('t-quarentena', [
-    { titulo: 'Fonte', valor: l => l.fonte },
-    { titulo: 'Motivo da rejeição', valor: l => l.motivo },
-    { titulo: 'Linhas', num: true, valor: l => n(l.linhas) },
-  ], d.quarentena);
-  tabela('t-execucoes', [
-    { titulo: 'Ingestão', valor: l => new Date(l.inicio).toLocaleString('pt-BR') },
-    { titulo: 'Status', valor: l => l.status },
-    { titulo: 'Resultado', valor: l => l.detalhe },
-    { titulo: 'Duração', num: true, valor: l => fmt(l.duracao_s) + ' s' },
-  ], d.execucoes);
-}).catch(e => {
-  document.getElementById('erro').style.display = 'block';
-  console.error(e);
-});
-</script>
+<script src="app.js"></script>
 </body>
 </html>

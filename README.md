@@ -5,7 +5,8 @@ carga, geração por usina, intercâmbio entre regiões e capacidade instalada d
 Interligado Nacional. Os dados passam por camadas bronze, silver e gold, com testes de
 qualidade e quarentena, e terminam num modelo estrela e num dashboard público.
 
-**Dashboard:** https://glucas290.github.io/energia-sin-pipeline/
+**Dashboard:** https://glucas290.github.io/energia-sin-pipeline/ (filtros de período,
+subsistema e fonte, filtro cruzado entre gráficos e ranking de usinas)
 
 Tudo roda com ferramentas gratuitas e sem servidor: Python, DuckDB, dbt e GitHub Actions.
 
@@ -29,7 +30,7 @@ flowchart LR
 | Ingestão incremental | Python (requests) | [`ingestao/`](ingestao) |
 | Armazenamento e processamento | DuckDB | `data/energia.duckdb` |
 | Transformação, testes e quarentena | dbt (dbt-duckdb) | [`dbt/`](dbt) |
-| Dashboard | HTML + ECharts, gerado em Python | [`dashboard/`](dashboard) |
+| Dashboard interativo | HTML + JavaScript + ECharts, dados exportados em Python | [`dashboard/`](dashboard) |
 | Orquestração e publicação | GitHub Actions + GitHub Pages | [`.github/workflows/`](.github/workflows) |
 
 ## O que o pipeline faz

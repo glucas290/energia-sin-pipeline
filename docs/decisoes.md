@@ -351,3 +351,22 @@ O dicionário de dados é gerado por `scripts/gerar_dicionario.py` a partir das 
 do dbt e dos tipos reais do banco (`dbt docs generate`), para não divergir do código.
 Removi o `pandas` do `requirements.txt`: não era usado em nenhum ponto, e validei a
 instalação limpa sem ele.
+
+### Dashboard interativo
+
+A primeira versão publicava séries já agregadas, sem filtros. Para ter a interação de
+um Power BI sem servidor, o `dados.json` passou a levar os dados no menor grão que cabe
+numa página (geração por dia × subsistema × fonte, perfil por mês × hora, energia por
+usina × mês, capacidade por unidade com datas de entrada e saída) e o navegador
+recalcula tudo a cada filtro. São 2,2 MB, 0,5 MB comprimidos pelo GitHub Pages.
+
+- Filtros de período (atalhos e datas livres), subsistema, fonte e granularidade
+  (dia, mês, ano); cada visual indica quais filtros se aplicam a ele.
+- Filtro cruzado: clicar numa fonte ou num subsistema em um gráfico filtra a página.
+- Os filtros ficam na URL, então um link reproduz exatamente a visão filtrada.
+- Ranking de usinas com busca, exportação em CSV e histórico mensal da usina ao clicar.
+- A capacidade em cada data é calculada por varredura dos eventos de entrada e
+  desativação das unidades, o que permite qualquer data de corte sem pré-agregar.
+
+Em 30 dias de dados, a geração média calculada no navegador (85,3 GW) coincide com a
+carga média (85,3 GW), o que serve de checagem cruzada entre as duas fatos.
