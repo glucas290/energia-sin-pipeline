@@ -310,3 +310,37 @@ e o dado publicado é só o agregado, nunca a base completa.
 
 O custo é não ter filtros que dependam de consultar a base em tempo real; para um
 painel de acompanhamento diário isso não faz falta.
+
+## Fase 6: orquestração com GitHub Actions
+
+### Dois workflows
+
+- `pipeline.yml`: roda todo dia às 23h30 UTC, depois que o ONS regrava os arquivos, e
+  também sob demanda. Ingestão → `dbt build` (modelos e testes) → exportação do
+  dashboard → publicação no GitHub Pages. Se qualquer teste do dbt falhar, o job falha,
+  o site não é republicado com dado ruim e o GitHub avisa por e-mail.
+- `ci.yml`: a cada push e pull request, roda o pytest e o `dbt parse`, que valida
+  sintaxe e referências dos modelos sem precisar dos dados.
+
+### Estado entre execuções com `actions/cache`
+
+O runner do GitHub começa vazio a cada execução. Sem estado, toda rodada baixaria os
+2,3 GB de novo e a carga incremental não existiria na prática. Guardo `data/` (bronze
+e banco DuckDB) no cache do Actions: cada execução restaura o cache mais recente e
+salva um novo ao final. O limite gratuito é de 10 GB por repositório e o GitHub
+descarta os mais antigos sozinho; cada entrada fica em torno de 2,5 GB antes da
+compressão.
+
+O cache é salvo logo depois da ingestão, mesmo que o dbt falhe, para não repetir
+downloads. Se o cache se perder (expira após 7 dias sem uso), a próxima execução faz
+a carga completa e o pipeline segue igual: a ingestão é idempotente e o modelo
+incremental faz full refresh quando a tabela não existe. Há também uma opção manual
+`recarga_completa` para forçar isso.
+
+Considerei guardar o banco em um bucket próprio (S3 ou R2), mas isso exigiria conta e
+credenciais; o cache resolve sem nada além do GitHub.
+
+### Limitação conhecida
+
+O GitHub desativa workflows agendados em repositórios públicos sem atividade por 60
+dias. Se isso acontecer, basta reativar na aba Actions.
