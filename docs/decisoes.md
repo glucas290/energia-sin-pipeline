@@ -273,3 +273,40 @@ ingestão, cobre o log pedido: linhas lidas, gravadas e rejeitadas, duração e 
 
 Escrevi dois testes genéricos (`chave_unica` e `quarentena_abaixo_de`) em vez de
 instalar o `dbt_utils`. São poucas linhas e o projeto não depende de baixar pacotes.
+
+## Fase 5: gold e dashboard
+
+### Gold
+
+As oito tabelas do [modelo](modelo_dados.md) são construídas a partir das views silver
+em cerca de 4 s, com testes de chave única e de integridade referencial (toda chave
+estrangeira das fatos existe na dimensão). A chave substituta de `dim_usina` é o MD5
+da chave natural: é determinística, então a fato pode calculá-la sem join com a
+dimensão e o valor não muda entre reconstruções.
+
+Conferi os números contra a ordem de grandeza conhecida do SIN: carga de 697 TWh em
+2025, 58% de geração hidráulica, fator de capacidade de 42% na hidráulica, 39% na
+eólica e 91% na nuclear.
+
+### Geração distribuída fora do fator de capacidade
+
+O primeiro cálculo deu 63% de fator de capacidade para a solar, o que é impossível. A
+causa: a geração inclui os agregados de MMGD (painéis em telhados e pequenas usinas),
+que respondem por 64% da geração solar, mas o cadastro de capacidade só tem as usinas
+despachadas pelo ONS. Sem os agregados no numerador, a solar fica em 22%. O dashboard
+usa esse recorte e explica o motivo.
+
+### Dashboard estático em vez de Evidence ou Streamlit
+
+O plano era Evidence ou Streamlit. O Evidence mudou para um produto em nuvem com login
+obrigatório, e o Streamlit precisaria de conta no Streamlit Community Cloud e de um
+lugar público para os dados, já que o banco não vai para o Git.
+
+Optei por um dashboard estático: `dashboard/exportar.py` roda as consultas na gold e
+grava um `dados.json` agregado (cerca de 500 KB); `dashboard/index.html` desenha os
+gráficos no navegador com ECharts. O GitHub Actions gera o site a cada execução e
+publica no GitHub Pages. Não há servidor, nada a pagar e nenhuma conta além do GitHub,
+e o dado publicado é só o agregado, nunca a base completa.
+
+O custo é não ter filtros que dependam de consultar a base em tempo real; para um
+painel de acompanhamento diário isso não faz falta.

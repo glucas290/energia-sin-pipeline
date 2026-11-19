@@ -21,3 +21,6 @@ logs/
 CLAUDE.md
 .claude/
 dbt/.user.yml
+
+# Dashboard gerado (publicado pelo GitHub Actions)
+site/
