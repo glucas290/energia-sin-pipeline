@@ -170,3 +170,48 @@ carga).
 - 8 unidades geradoras têm `dat_desativacao` anterior a `dat_entradaoperacao`.
 - 8 unidades não têm `dat_entradateste`.
 - `val_geracao` nulo em usinas sem medição: manter como nulo, não como zero.
+
+## Fase 3: ingestão (bronze)
+
+### Bronze como cópia fiel dos arquivos
+
+A bronze guarda os CSVs exatamente como o ONS publica, em `data/bronze/<fonte>/`.
+Considerei carregar tudo em tabelas DuckDB com colunas `VARCHAR`, mas manter o arquivo
+original é a cópia mais fiel possível e deixa a declaração de tipos num lugar só, na
+leitura pela silver. Se uma regra de limpeza estiver errada, reprocesso a partir da
+bronze sem baixar nada de novo.
+
+### Carga incremental pelo ETag
+
+A listagem do S3 (`ListObjectsV2`) devolve o ETag de cada arquivo numa única chamada
+por prefixo. Comparo com `controle.manifesto` e baixo só o que é novo, mudou ou sumiu
+do disco. Isso cobre as revisões que o ONS faz em períodos já publicados, que um
+filtro por data perderia.
+
+O ETag gravado no manifesto é o da resposta do download, não o da listagem: se o ONS
+regravar o arquivo entre as duas chamadas, o manifesto descreve o conteúdo que de fato
+está no disco.
+
+### Idempotência e download atômico
+
+Cada arquivo substitui a versão anterior; nada é acrescentado. Rodar de novo sem
+mudança na origem resulta em zero downloads.
+
+O download vai para um `.part` e só é renomeado para o nome final se o número de bytes
+bater com o `Content-Length`. Uma queda de rede no meio não deixa CSV truncado na
+bronze nem registro no manifesto. O manifesto é gravado arquivo a arquivo, então uma
+execução interrompida retoma de onde parou.
+
+### Log de execuções
+
+`controle.execucoes` tem uma linha por rodada: início, fim, duração, status, arquivos
+verificados, baixados e ignorados, bytes e linhas. Em caso de falha a linha fica com
+status `erro` e a mensagem, e o processo termina com código diferente de zero, o que
+vai falhar o job no GitHub Actions. Linhas rejeitadas entram na Fase 4, com a
+quarentena.
+
+### Sem boto3
+
+O bucket é público e só preciso de duas operações (listar e baixar), então uso a API
+REST do S3 com `requests`, com retry exponencial para 429 e 5xx. O `boto3` traria uma
+dependência pesada e exigiria configurar acesso anônimo explicitamente.
