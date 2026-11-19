@@ -1,0 +1,215 @@
+version: 2
+
+models:
+  - name: dim_data
+    description: Calendário diário de 2000-01-01 até o fim do ano corrente.
+    columns:
+      - name: data
+        description: Chave da dimensão.
+        data_tests: [unique, not_null]
+      - name: ano
+        description: Ano.
+      - name: trimestre
+        description: Trimestre (1 a 4).
+      - name: mes
+        description: Mês (1 a 12).
+      - name: nome_mes
+        description: Nome do mês em português.
+      - name: ano_mes
+        description: Ano e mês no formato AAAA-MM.
+      - name: dia
+        description: Dia do mês.
+      - name: dia_semana
+        description: Dia da semana ISO, de 1 (segunda) a 7 (domingo).
+      - name: nome_dia_semana
+        description: Nome do dia da semana.
+      - name: fim_de_semana
+        description: Verdadeiro para sábado e domingo.
+
+  - name: dim_subsistema
+    description: Subsistemas do SIN. Chave natural, curta e igual em todos os conjuntos do ONS.
+    columns:
+      - name: subsistema_id
+        description: Sigla do subsistema (N, NE, S, SE, PY).
+        data_tests: [unique, not_null]
+      - name: nome_subsistema
+        description: Nome padronizado.
+      - name: pertence_sin
+        description: Falso para PY, a parte paraguaia de Itaipu, que só aparece na capacidade instalada.
+
+  - name: dim_fonte
+    description: Fonte de geração, no nível do tipo de usina publicado pelo ONS.
+    columns:
+      - name: fonte_id
+        description: hidraulica, termica, eolica, solar ou nuclear.
+        data_tests: [unique, not_null]
+      - name: nome_fonte
+        description: Nome de exibição.
+      - name: renovavel
+        description: Verdadeiro para hidráulica, eólica e solar.
+
+  - name: dim_usina
+    description: >
+      Usinas e agregados de pequenas usinas que aparecem na geração. SCD tipo 1: guarda os
+      atributos da aparição mais recente.
+    columns:
+      - name: usina_sk
+        description: Chave substituta, hash MD5 da chave natural.
+        data_tests: [unique, not_null]
+      - name: chave_natural
+        description: id_ons; para agregados de pequenas usinas sem id_ons, o id reconstruído a partir do nome.
+        data_tests: [unique, not_null]
+      - name: id_ons
+        description: Identificador da usina no ONS. Nulo nos agregados publicados a partir de mai/2026.
+      - name: nome_usina
+        description: Nome mais recente publicado pelo ONS.
+      - name: ceg
+        description: Código Único do Empreendimento de Geração (ANEEL). Nulo quando a origem traz '-'.
+      - name: uf
+        description: Sigla do estado.
+      - name: subsistema_id
+        description: Subsistema da usina.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_subsistema'), field: subsistema_id}
+      - name: fonte_id
+        description: Fonte da usina.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_fonte'), field: fonte_id}
+      - name: combustivel
+        description: Tipo de combustível publicado pelo ONS.
+      - name: modalidade_operacao
+        description: TIPO I, TIPO II-A, TIPO II-B, TIPO III, Conjunto de Usinas ou Pequenas Usinas.
+      - name: agregado_pequenas_usinas
+        description: Verdadeiro para os agregados de pequenas usinas (MMGD e Tipo III), que somam várias usinas por estado.
+      - name: primeira_data
+        description: Primeiro dia com geração na janela carregada.
+      - name: ultima_data
+        description: Último dia com geração na janela carregada.
+
+  - name: fato_carga
+    description: Uma linha por subsistema e dia, com a carga média do dia.
+    data_tests:
+      - chave_unica:
+          arguments: {colunas: [data, subsistema_id]}
+    columns:
+      - name: data
+        description: Dia.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_data'), field: data}
+      - name: subsistema_id
+        description: Subsistema.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_subsistema'), field: subsistema_id}
+      - name: carga_mwmed
+        description: Carga média do dia, em MWmed. Não somar ao longo do tempo.
+      - name: energia_mwh
+        description: Energia consumida no dia, em MWh (carga_mwmed × 24). Aditiva.
+
+  - name: fato_geracao
+    description: Uma linha por usina e hora, com a geração média da hora.
+    data_tests:
+      - chave_unica:
+          arguments: {colunas: [data, hora, usina_sk]}
+    columns:
+      - name: data
+        description: Dia.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_data'), field: data}
+      - name: hora
+        description: Hora de início do intervalo (0 a 23), horário de Brasília.
+      - name: usina_sk
+        description: Usina.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_usina'), field: usina_sk}
+      - name: subsistema_id
+        description: Subsistema da usina.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_subsistema'), field: subsistema_id}
+      - name: fonte_id
+        description: Fonte da usina.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_fonte'), field: fonte_id}
+      - name: geracao_mwmed
+        description: Geração média na hora, em MWmed. Nula quando a usina não tem medição.
+      - name: energia_mwh
+        description: Energia gerada na hora, em MWh. Aditiva.
+
+  - name: fato_intercambio
+    description: >
+      Uma linha por par de subsistemas e hora. Cada par está numa orientação fixa
+      (N→NE, N→SE, NE→SE, S→SE); valor positivo é fluxo de origem para destino.
+    data_tests:
+      - chave_unica:
+          arguments: {colunas: [data, hora, subsistema_origem_id, subsistema_destino_id]}
+    columns:
+      - name: data
+        description: Dia.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_data'), field: data}
+      - name: hora
+        description: Hora de início do intervalo (0 a 23), horário de Brasília.
+      - name: subsistema_origem_id
+        description: Subsistema de origem na orientação fixa.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_subsistema'), field: subsistema_id}
+      - name: subsistema_destino_id
+        description: Subsistema de destino na orientação fixa.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_subsistema'), field: subsistema_id}
+      - name: intercambio_verificado_mwmed
+        description: Fluxo verificado na hora, em MWmed, com sinal.
+      - name: intercambio_programado_mwmed
+        description: Fluxo programado na hora, em MWmed, com sinal. Publicado pelo ONS só a partir de 2026.
+      - name: energia_verificada_mwh
+        description: Energia transferida na hora, em MWh, com sinal. Aditiva.
+
+  - name: fato_capacidade
+    description: >
+      Uma linha por unidade geradora, com o período de operação. A capacidade instalada
+      numa data D é a soma de potencia_mw das unidades com data_entrada_operacao <= D e
+      data_desativacao nula ou maior que D.
+    columns:
+      - name: cod_equipamento
+        description: Código da unidade geradora no ONS.
+        data_tests: [unique, not_null]
+      - name: subsistema_id
+        description: Subsistema da unidade, incluindo PY.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_subsistema'), field: subsistema_id}
+      - name: fonte_id
+        description: Fonte da unidade.
+        data_tests:
+          - relationships:
+              arguments: {to: ref('dim_fonte'), field: fonte_id}
+      - name: uf
+        description: Sigla do estado.
+      - name: ceg
+        description: Código ANEEL do empreendimento; liga à usina quando há correspondência.
+      - name: nome_usina
+        description: Nome da usina na publicação de capacidade.
+      - name: data_entrada_operacao
+        description: Data de entrada em operação comercial.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments: {to: ref('dim_data'), field: data}
+              config: {where: "data_entrada_operacao >= '2000-01-01'"}
+      - name: data_desativacao
+        description: Data de desativação. Nula se a unidade está ativa.
+      - name: potencia_mw
+        description: Potência nominal da unidade, em MW.
