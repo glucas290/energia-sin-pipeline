@@ -1,7 +1,8 @@
 # Modelo de dados
 
 Camada gold em modelo estrela. As decisões e as alternativas descartadas estão em
-[decisoes.md](decisoes.md).
+[decisoes.md](decisoes.md); os tipos finais de cada coluna, gerados a partir do dbt, em
+[dicionario_dados.md](dicionario_dados.md).
 
 ```text
                               dim_data
@@ -86,8 +87,8 @@ valor analítico.
 | Coluna | Tipo | Descrição |
 | --- | --- | --- |
 | `usina_sk` | varchar | Chave substituta: hash da chave natural |
-| `chave_natural` | varchar | `id_ons`; quando nulo, `nom_usina` |
-| `id_ons` | varchar | Nulo nos agregados de pequenas usinas |
+| `chave_natural` | varchar | `id_ons`; nos agregados de pequenas usinas publicados sem `id_ons` (a partir de mai/2026), o id reconstruído a partir do nome |
+| `id_ons` | varchar | Nulo nos agregados publicados a partir de mai/2026 |
 | `nome_usina` | varchar | Nome mais recente |
 | `ceg` | varchar | Código ANEEL; nulo quando a origem traz `-` |
 | `uf` | varchar | |
@@ -95,7 +96,9 @@ valor analítico.
 | `fonte_id` | varchar | |
 | `combustivel` | varchar | |
 | `modalidade_operacao` | varchar | `TIPO I`, `TIPO II-A`, ..., `Conjunto de Usinas` |
-| `agregado_pequenas_usinas` | boolean | Verdadeiro quando não há `id_ons` (Tipo III e MMGD) |
+| `agregado_pequenas_usinas` | boolean | Verdadeiro para os agregados de pequenas usinas (Tipo III e MMGD) |
+| `primeira_data` | date | Primeiro dia com geração na janela carregada |
+| `ultima_data` | date | Último dia com geração na janela carregada |
 
 ## Fatos
 

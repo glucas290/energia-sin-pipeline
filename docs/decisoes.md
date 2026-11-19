@@ -344,3 +344,10 @@ credenciais; o cache resolve sem nada além do GitHub.
 
 O GitHub desativa workflows agendados em repositórios públicos sem atividade por 60
 dias. Se isso acontecer, basta reativar na aba Actions.
+
+## Fase 7: documentação
+
+O dicionário de dados é gerado por `scripts/gerar_dicionario.py` a partir das descrições
+do dbt e dos tipos reais do banco (`dbt docs generate`), para não divergir do código.
+Removi o `pandas` do `requirements.txt`: não era usado em nenhum ponto, e validei a
+instalação limpa sem ele.
