@@ -1,0 +1,87 @@
+version: 2
+
+models:
+  - name: stg_carga
+    description: Carga diária tipada, com o motivo de rejeição quando a linha não passa nas regras.
+    data_tests:
+      - quarentena_abaixo_de:
+          arguments: {fonte: carga, limite: 0.01}
+
+  - name: stg_geracao
+    description: >
+      Geração horária por usina, tipada. Incremental por arquivo: reprocessa só os CSVs
+      que a ingestão baixou desde o último build.
+    data_tests:
+      - quarentena_abaixo_de:
+          arguments: {fonte: geracao, limite: 0.01}
+
+  - name: stg_intercambio
+    description: Intercâmbio horário com cada par numa orientação fixa e o sinal ajustado.
+    data_tests:
+      - quarentena_abaixo_de:
+          arguments: {fonte: intercambio, limite: 0.01}
+
+  - name: stg_capacidade
+    description: Unidades geradoras com datas e potência tipadas.
+    data_tests:
+      - quarentena_abaixo_de:
+          arguments: {fonte: capacidade, limite: 0.01}
+
+  - name: silver_carga
+    description: Linhas de stg_carga que passaram nas regras.
+    data_tests:
+      - chave_unica:
+          arguments: {colunas: [data, subsistema_id]}
+    columns:
+      - name: data
+        data_tests: [not_null]
+      - name: subsistema_id
+        data_tests: [not_null, {accepted_values: {arguments: {values: ['N', 'NE', 'S', 'SE']}}}]
+      - name: carga_mwmed
+        data_tests: [not_null]
+
+  - name: silver_geracao
+    description: Linhas de stg_geracao que passaram nas regras.
+    data_tests:
+      - chave_unica:
+          arguments: {colunas: [data, hora, chave_natural]}
+    columns:
+      - name: chave_natural
+        description: id_ons; para agregados de pequenas usinas sem id_ons, o id reconstruído a partir do nome.
+        data_tests: [not_null]
+      - name: subsistema_id
+        data_tests: [not_null, {accepted_values: {arguments: {values: ['N', 'NE', 'S', 'SE']}}}]
+      - name: fonte_id
+        data_tests: [not_null]
+      - name: hora
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+                quote: false
+
+  - name: silver_intercambio
+    description: Linhas de stg_intercambio que passaram nas regras.
+    data_tests:
+      - chave_unica:
+          arguments: {colunas: [data, hora, subsistema_origem_id, subsistema_destino_id]}
+    columns:
+      - name: intercambio_verificado_mwmed
+        data_tests: [not_null]
+
+  - name: silver_capacidade
+    description: Linhas de stg_capacidade que passaram nas regras.
+    columns:
+      - name: cod_equipamento
+        data_tests: [unique, not_null]
+      - name: fonte_id
+        data_tests: [not_null]
+
+  - name: quarentena
+    description: >
+      Linhas rejeitadas pelas regras da silver, com a fonte, o arquivo de origem, o motivo
+      e os valores brutos. Nada é descartado em silêncio.
+    columns:
+      - name: motivo_rejeicao
+        data_tests: [not_null]

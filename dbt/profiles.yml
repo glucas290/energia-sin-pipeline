@@ -1,0 +1,7 @@
+energia:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: "{{ env_var('DADOS_DIR', '../data') }}/energia.duckdb"
+      threads: 4

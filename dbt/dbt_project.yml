@@ -1,0 +1,26 @@
+name: energia_sin
+version: "1.0.0"
+profile: energia
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+on-run-end:
+  - "{{ registrar_execucao(results) }}"
+
+models:
+  energia_sin:
+    silver:
+      +schema: silver
+      +materialized: table
+    gold:
+      +schema: gold
+      +materialized: table
+
+seeds:
+  energia_sin:
+    +schema: referencia

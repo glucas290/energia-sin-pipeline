@@ -1,0 +1,15 @@
+version: 2
+
+seeds:
+  - name: subsistemas
+    description: Subsistemas do SIN, com nome padronizado. PY aparece só na capacidade instalada.
+    columns:
+      - name: subsistema_id
+        data_tests: [unique, not_null]
+  - name: fontes
+    description: De-para do tipo de usina publicado pelo ONS para a fonte usada no modelo.
+    columns:
+      - name: nom_tipousina
+        data_tests: [unique, not_null]
+      - name: fonte_id
+        data_tests: [unique, not_null]

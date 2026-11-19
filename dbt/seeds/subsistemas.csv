@@ -1,0 +1,6 @@
+subsistema_id,nome_subsistema,pertence_sin
+N,Norte,true
+NE,Nordeste,true
+S,Sul,true
+SE,Sudeste/Centro-Oeste,true
+PY,Paraguai (Itaipu 50 Hz),false

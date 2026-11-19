@@ -1,0 +1,11 @@
+version: 2
+
+sources:
+  - name: controle
+    description: Tabelas de controle gravadas pela ingestão (ingestao/ingerir.py).
+    schema: controle
+    tables:
+      - name: manifesto
+        description: Um registro por arquivo da bronze, com o ETag e quando foi baixado.
+      - name: execucoes
+        description: Log de execuções da ingestão.

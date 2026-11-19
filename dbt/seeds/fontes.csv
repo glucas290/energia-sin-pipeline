@@ -1,0 +1,6 @@
+nom_tipousina,fonte_id,nome_fonte,renovavel
+HIDROELÉTRICA,hidraulica,Hidráulica,true
+TÉRMICA,termica,Térmica,false
+EOLIELÉTRICA,eolica,Eólica,true
+FOTOVOLTAICA,solar,Solar,true
+NUCLEAR,nuclear,Nuclear,false

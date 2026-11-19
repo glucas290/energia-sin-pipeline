@@ -20,3 +20,4 @@ logs/
 # Configuracao local de ferramentas
 CLAUDE.md
 .claude/
+dbt/.user.yml

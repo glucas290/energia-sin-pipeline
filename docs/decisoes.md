@@ -215,3 +215,61 @@ quarentena.
 O bucket é público e só preciso de duas operações (listar e baixar), então uso a API
 REST do S3 com `requests`, com retry exponencial para 429 e 5xx. O `boto3` traria uma
 dependência pesada e exigiria configurar acesso anônimo explicitamente.
+
+## Fase 4: silver com testes de qualidade
+
+### Três modelos por fonte: stg, silver e quarentena
+
+Cada `stg_<fonte>` lê a bronze com todas as colunas como texto, aplica os tipos com
+`try_cast` e calcula `motivo_rejeicao` (nulo quando a linha passa em todas as regras).
+`silver_<fonte>` é uma view com as linhas válidas e `quarentena` reúne as rejeitadas das
+quatro fontes, com o arquivo de origem, o motivo e os valores brutos em JSON. Valor
+inválido não quebra o pipeline nem some: vira linha de quarentena com motivo legível.
+
+Se o ONS remover uma coluna que eu uso, o `select` explícito falha no build, o que é o
+comportamento que quero (mudança de schema precisa de decisão humana). Coluna nova é
+ignorada até eu decidir usá-la.
+
+Primeira carga (18,4 milhões de linhas lidas):
+
+| Fonte | Rejeitadas | Motivo |
+| --- | --- | --- |
+| carga | 13 | valor ausente (dias de 2013) |
+| geração | 33 | geração negativa |
+| capacidade | 8 | desativação anterior à entrada em operação |
+| intercâmbio | 0 | |
+
+O teste `quarentena_abaixo_de` falha o build se mais de 1% das linhas de uma fonte for
+rejeitado: um volume desses indica mudança na origem, não sujeira pontual.
+
+### Incremental por arquivo na geração
+
+`stg_geracao` é um modelo incremental com estratégia `delete+insert` e `arquivo_origem`
+como chave: a cada build, lê só os CSVs que o manifesto marca como baixados depois do
+último processamento e substitui todas as linhas desses arquivos. A carga completa
+leva cerca de 14 s; sem arquivo novo, 0,2 s; com um mês regravado, 1 s. Simulei a
+regravação de nov/2026 e a contagem de linhas ficou idêntica, sem duplicar.
+
+As outras fontes somam menos de 1 milhão de linhas e são reconstruídas inteiras a cada
+build; incremental ali só acrescentaria complexidade.
+
+### Chave dos agregados de pequenas usinas
+
+A partir de mai/2026 os 117 agregados de pequenas usinas (MMGD e Tipo III) passaram a
+vir sem `id_ons` e com outro nome (`PQU ACRAC FOTOV MMGD` → `PQU ACRAC MMGD`). Usar o
+nome como chave criaria duas usinas para o mesmo agregado. O id antigo segue um padrão
+(`PQU_<código>_<GD ou inicial do tipo>`) que é reconstruível a partir do nome novo;
+validei a regra nos 35 meses: as 117 chaves reconstruídas coincidem com os ids
+antigos e não há duplicidade de (instante, chave).
+
+### Log da transformação
+
+Um hook `on-run-end` grava em `controle.execucoes_dbt` o status de cada comando dbt
+(nós executados, erros, avisos e quais falharam) e em `controle.qualidade` as linhas
+lidas, gravadas na silver e rejeitadas por fonte. Junto com `controle.execucoes` da
+ingestão, cobre o log pedido: linhas lidas, gravadas e rejeitadas, duração e status.
+
+### Testes sem pacotes externos
+
+Escrevi dois testes genéricos (`chave_unica` e `quarentena_abaixo_de`) em vez de
+instalar o `dbt_utils`. São poucas linhas e o projeto não depende de baixar pacotes.
